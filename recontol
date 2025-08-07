@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Cek argumen
+if [ -z "$1" ]; then
+    echo "Usage: recontest <domain.com>"
+    exit 1
+fi
+
+domain=$1
+timestamp=$(date +"%Y%m%d-%H%M%S")
+outdir="recontest-${domain}-${timestamp}"
+mkdir -p "$outdir"
+
+echo "[*] Recon started for $domain"
+echo "[*] Output directory: $outdir"
+
+# 1. Subdomain enumeration
+echo "[*] Running assetfinder..."
+assetfinder --subs-only $domain | tee "$outdir/subdomains_raw.txt"
+
+# 2. Live subdomains (dnsx)
+echo "[*] Validating live subdomains with dnsx..."
+cat "$outdir/subdomains_raw.txt" | dnsx -silent | tee "$outdir/subdomains_alive.txt"
+
+# 3. Fetch HTTP info with httpx
+echo "[*] Checking HTTP responses with httpx..."
+cat "$outdir/subdomains_alive.txt" | httpx -title -status-code -tech-detect -silent | tee "$outdir/httpx_output.txt"
+
+# 4. Crawl with hakrawler
+echo "[*] Crawling live domains with hakrawler..."
+cat "$outdir/subdomains_alive.txt" | hakrawler -depth 2 -plain | tee "$outdir/hakrawler_urls.txt"
+
+# 5. Get Wayback URLs and gauplus
+echo "[*] Collecting URLs from Wayback and gauplus..."
+cat "$outdir/subdomains_alive.txt" | waybackurls | tee "$outdir/waybackurls.txt"
+cat "$outdir/subdomains_alive.txt" | gauplus | tee "$outdir/gauplus_urls.txt"
+
+# Gabungkan semua URL unik
+cat "$outdir/waybackurls.txt" "$outdir/gauplus_urls.txt" "$outdir/hakrawler_urls.txt" | sort -u | tee "$outdir/all_urls.txt"
+
+# 6. Extract parameters with unfurl
+echo "[*] Extracting parameters with unfurl..."
+cat "$outdir/all_urls.txt" | unfurl --unique keys | tee "$outdir/params.txt"
+
+# 7. GF pattern matching (xss, sqli, ssrf, etc)
+echo "[*] Running GF pattern matching..."
+for pattern in xss sqli ssrf lfi rce idor redirect; do
+    cat "$outdir/all_urls.txt" | gf $pattern | tee "$outdir/gf_$pattern.txt"
+done
+
+# 8. Run nuclei on live subdomains
+echo "[*] Running nuclei scan..."
+cat "$outdir/subdomains_alive.txt" | nuclei -silent -severity low,medium,high,critical | tee "$outdir/nuclei.txt"
+
+# 9. Extract IPs and map with mapcidr
+echo "[*] Extracting IPs with httpx and mapping CIDR..."
+cat "$outdir/subdomains_alive.txt" | httpx -ip -silent | cut -d " " -f2 | sort -u | tee "$outdir/ips.txt"
+cat "$outdir/ips.txt" | mapcidr -silent | tee "$outdir/cidr_mapped.txt"
+
+echo "[*] Recon complete for $domain"
