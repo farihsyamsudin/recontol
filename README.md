@@ -1,93 +1,154 @@
-#!/bin/bash
-
-# Nama file README
-readme_file="README.md"
-
-# Konten README dalam format Markdown
-readme_content="
 # 🛠️ recontol
 
-**recontol** adalah *wrapper toolset* sederhana namun kuat yang mengotomatisasi proses *reconnaissance* untuk *bug bounty* dan *red teaming*. Dirancang untuk menghemat waktumu dan memaksimalkan efisiensi dengan menggabungkan *tools* Go-based terpopuler ke dalam satu alur kerja yang rapi.
+**recontol** adalah sebuah *wrapper toolset* sederhana namun kuat yang mengotomatisasi proses *reconnaissance* untuk *bug bounty* dan *red teaming*. Dirancang untuk menghemat waktu dan memaksimalkan efisiensi dengan menggabungkan beberapa tool Go-based populer ke dalam satu alur kerja yang rapi.
 
 ---
 
-## 🚀 Fitur Unggulan
+## 🔎 Ringkasan
 
-- **Otomatisasi Penuh**: Mengotomatisasi penemuan aset menggunakan *tools* terbaik seperti \`assetfinder\`, \`waybackurls\`, \`httpx\`, dan lainnya.
-- **Ringan & Cepat**: Berbasis *bash script* sehingga ringan dan dapat berjalan di semua sistem berbasis *nix*.
-- **Mudah Diperluas**: Kamu dapat dengan mudah menambahkan *tools recon* favoritmu ke dalam skrip utama.
-- **Laporan Terstruktur**: Menghasilkan laporan ringkasan yang rapi dan mudah dibaca, sambil tetap menyimpan *output* mentah untuk analisis mendalam.
+* **Tujuan:** Mengumpulkan aset, URL, dan hasil pemindaian dasar secara otomatis untuk mempercepat fase reconnaissance.
+* **Pendekatan:** Bash script yang memanggil tool populer (mis. `assetfinder`, `waybackurls`, `httpx`, `naabu`, `nuclei`) lalu menyimpan output mentah dan ringkasan laporan.
 
 ---
 
-## ⚙️ Persiapan
+## 🚀 Fitur Utama
 
-Sebelum menggunakan **recontol**, pastikan kamu memiliki lingkungan yang tepat. **recontol** mengandalkan beberapa *tools* penting yang sebagian besar dibangun di atas Go.
+* Otomatisasi alur recon (asset discovery → endpoint harvesting → HTTP probing → scanning dasar).
+* Output terstruktur: folder per-domain dengan subfolder `recon/`, `scans/`, `visuals/` dan file ringkasan `summary_report.txt`.
+* Ringan dan portabel — berbasis Bash sehingga mudah dijalankan pada mesin Linux/macOS.
+* Mudah diperluas — tambahkan tool atau step baru cukup dengan mengedit skrip utama.
 
-### 1. Instalasi Go
+---
 
-Pastikan **Go** sudah terinstal di sistemmu. Kamu bisa mengunduhnya dari [situs resmi Go](https://go.dev/doc/install) atau menggunakan manajer paket (misalnya \`sudo apt install golang\`).
+## ⚙️ Prasyarat
 
-### 2. Instalasi Tools
+Sebelum menjalankan `recontol`, pastikan:
 
-**recontol** membutuhkan *tools* berikut untuk berfungsi dengan baik. Kami telah menyertakan skrip \`install.sh\` untuk mempermudah proses ini.
+1. **Go** terinstal (untuk mengompilasi/menjalankan beberapa tool berbasis Go).
 
-\`\`\`bash
-# Beri izin eksekusi pada skrip instalasi
+   * Unduh dari [https://go.dev/doc/install](https://go.dev/doc/install) atau pasang lewat paket manager (contoh: `sudo apt install golang`).
+
+2. Tool-tool recon yang diperlukan (bisa diinstal otomatis lewat `install.sh` yang disediakan):
+
+   * assetfinder
+   * waybackurls
+   * httpx
+   * naabu
+   * nuclei
+   * hakrawler
+   * gf (pola-pola `~/.gf`)
+
+3. Dependensi sistem:
+
+* `libpcap-dev` (untuk `naabu`):
+
+```bash
+sudo apt-get install libpcap-dev
+```
+
+* `jq` (memproses output JSON untuk ringkasan):
+
+```bash
+sudo apt-get install jq
+```
+
+> Jika di macOS: gunakan `brew install jq` dan `brew install libpcap` (jika perlu).
+
+---
+
+## 🛠️ Instalasi
+
+1. Beri izin eksekusi pada skrip instalasi:
+
+```bash
 chmod +x install.sh
+```
 
-# Jalankan skrip instalasi
+2. Jalankan skrip instalasi:
+
+```bash
 ./install.sh
-\`\`\`
+```
 
-**Penting:** Jika kamu mengalami masalah saat instalasi, ini biasanya disebabkan oleh dependensi sistem yang hilang. Kamu perlu menginstal beberapa paket tambahan:
-
-- **\`libpcap-dev\`**: Dibutuhkan oleh \`naabu\` untuk pemindaian paket.
-  \`\`\`bash
-  sudo apt-get install libpcap-dev
-  \`\`\`
-- **\`jq\`**: Diperlukan untuk memproses *output* JSON dari \`httpx\` dan \`nuclei\` agar dapat membuat laporan ringkasan.
-  \`\`\`bash
-  sudo apt-get install jq
-  \`\`\`
-Setelah instalasi paket-paket ini, coba jalankan kembali \`install.sh\`.
+`install.sh` dirancang untuk mengunduh/menyiapkan tool yang diperlukan. Jika terjadi error, baca pesan error dan pastikan dependensi sistem telah dipasang.
 
 ---
 
-## 📖 Penggunaan
+## 📦 Cara Pakai
 
-Penggunaan **recontol** sangat sederhana. Cukup berikan nama domain sebagai argumen pertama.
+1. Beri izin eksekusi pada skrip utama:
 
-\`\`\`bash
-# Beri izin eksekusi pada skrip utama
+```bash
 chmod +x recontol.sh
+```
 
-# Jalankan recontol
+2. Jalankan `recontol` dengan domain target:
+
+```bash
 ./recontol.sh <domain.com>
-
-# Contoh:
+# Contoh
 ./recontol.sh example.com
-\`\`\`
+```
 
-Setelah selesai, semua *output* akan disimpan di dalam sebuah direktori bernama \`recontol-<domain>-<timestamp>\`. Kamu bisa menemukan laporan ringkasan di \`recontol-<domain>-<timestamp>/summary_report.txt\` dan semua hasil mentah di sub-direktori \`recon/\`, \`scans/\`, dan \`visuals/\`.
+3. Output disimpan di direktori:
+
+```
+recontol-<domain>-<timestamp>/
+├─ recon/        # hasil asset discovery & harvesting
+├─ scans/        # hasil pemindaian (naabu, nuclei, dll.)
+├─ visuals/      # file gambar/visualisasi (jika ada)
+└─ summary_report.txt
+```
 
 ---
 
-## ⚠️ Penjelasan Masalah Umum
+## 📋 Format Laporan
 
-### \`hakrawler\` Error
+`summary_report.txt` berisi ringkasan hasil penting (total host, service port yang ditemukan, temuan Nuclei yang signifikan, dsb.) disusun dari output mentah yang diolah dengan `jq` dan utilitas shell.
 
-Jika kamu melihat \`flag provided but not defined: -depth\`, ini berarti versi \`hakrawler\` kamu tidak mendukung *flag* \`--depth\`. Pastikan skrip \`recontol.sh\` menggunakan *flag* yang benar, yaitu \`-d\`.
+---
 
-### \`no such pattern\` pada \`gf\`
+## ⚠️ Permasalahan Umum & Solusi
 
-Ini terjadi karena *patterns* \`gf\` tidak ditemukan. Meskipun skrip \`install.sh\` sudah menyertakan langkah untuk mengunduhnya, pastikan \`~/.gf\` sudah berisi file-file pola yang diperlukan.
+* **`flag provided but not defined: -depth` (hakrawler)**
 
-### \`invalid CIDR address\` pada \`mapcidr\`
+  * Penyebab: versi `hakrawler` yang terpasang tidak mendukung flag `--depth`.
+  * Solusi: gunakan flag `-d` yang didukung, atau perbarui skrip agar sesuai dengan versi `hakrawler` yang terinstal.
 
-*Error* ini muncul ketika \`httpx\` gagal mengambil alamat IP. Baris \`cut\` pada skrip telah diperbarui untuk menyaring *output* dengan lebih baik dan hanya melewatkan IP yang valid ke \`mapcidr\`.
+* **`jq: command not found`**
 
-### \`jq: command not found\`
+  * Pastikan `jq` sudah terpasang: `sudo apt-get install jq` (atau `brew install jq`).
 
-Seperti yang sudah dijelaskan di bagian persiapan, \`jq\` adalah dependensi penting untuk memproses *output* JSON. Pastikan kamu sudah menginstalnya menggunakan \`sudo apt-get install jq\`.
-"
+* **`no such pattern` pada `gf`**
+
+  * Pastikan folder `~/.gf` berisi pola-pola yang benar. Jika belum ada, unduh koleksi pola GF (misal dari repo pola `gf`) dan letakkan di `~/.gf`.
+
+* **`invalid CIDR address` pada `mapcidr`**
+
+  * Biasanya disebabkan oleh output IP yang kotor dari `httpx`. Skrip telah menyaring IP, tetapi jika error masih muncul, cek baris yang mem-parsing IP dan pastikan hanya IP yang valid diteruskan ke `mapcidr`.
+
+---
+
+## 📝 Tips & Best Practices
+
+* Jalankan di lingkungan terisolasi (VM atau container) saat memindai target yang sensitif.
+* Selalu pastikan kamu memiliki izin eksplisit untuk melakukan recon/scan pada target (bounty program rules, written authorization, dsb.).
+* Simpan hasil mentah untuk audit dan reproduksi.
+
+---
+
+## 📣 Kontribusi
+
+Kontribusi sangat diterima! Buat *issue* atau *pull request* untuk:
+
+* Menambahkan/menyesuaikan tool
+* Memperbaiki bug
+* Menambah dokumentasi atau contoh konfigurasi
+
+---
+
+## ✉️ Kontak
+
+Jika ada pertanyaan atau ingin berdiskusi fitur baru, buka issue di repository atau hubungi maintainer proyek.
+
+> *Catatan: Selalu patuhi hukum dan kebijakan target sebelum menjalankan tool ini.*
